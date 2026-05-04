@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabaseClient'
 
-import Sidebar        from './components/Sidebar'
-import Header         from './components/Header'
-import RoomStatusCard from './components/RoomStatusCard'
-import AlertPanel     from './components/AlertPanel'
-import StatsBar       from './components/StatsBar'
-import DoorLogTable   from './components/DoorLogTable'
-import LockerLogTable from './components/LockerLogTable'
+import Sidebar              from './components/Sidebar'
+import Header               from './components/Header'
+import RoomStatusCard       from './components/RoomStatusCard'
+import AlertPanel           from './components/AlertPanel'
+import StatsBar             from './components/StatsBar'
+import DoorLogTable         from './components/DoorLogTable'
+import LockerLogTable       from './components/LockerLogTable'
+import CustomerManagement   from './components/CustomerManagement'
+import AccessHistory        from './components/AccessHistory'
 
 export default function App() {
+  const [activePage, setActivePage] = useState('dashboard')
   const [doorLogs,   setDoorLogs]   = useState([])
   const [lockerLogs, setLockerLogs] = useState([])
   const [loading,    setLoading]    = useState(true)
@@ -98,7 +101,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', width: '100%', minHeight: '100vh', background: 'var(--bg-body)', transition: 'background 0.25s ease' }}>
       {/* Fixed Sidebar */}
-      <Sidebar activePage="dashboard" />
+      <Sidebar activePage={activePage} onNavigate={setActivePage} />
       <div className="sidebar-spacer" />
 
       {/* Main Column */}
@@ -128,16 +131,22 @@ export default function App() {
 
         {/* Page Content */}
         <main style={{ flex: 1, padding: '28px 28px 40px' }}>
-          <Header />
-          <RoomStatusCard latestPintu={latestPintu} />
-          <AlertPanel     latestPintu={latestPintu} latestLoker={latestLoker} />
-          <StatsBar       doorLogs={doorLogs}        lockerLogs={lockerLogs} />
-
-          <div className="log-grid">
-            <DoorLogTable   logs={doorLogs} />
-            <LockerLogTable logs={lockerLogs} />
-          </div>
-
+          {activePage === 'customers' ? (
+            <CustomerManagement />
+          ) : activePage === 'history' ? (
+            <AccessHistory />
+          ) : (
+            <>
+              <Header />
+              <RoomStatusCard latestPintu={latestPintu} />
+              <AlertPanel     latestPintu={latestPintu} latestLoker={latestLoker} />
+              <StatsBar       doorLogs={doorLogs}        lockerLogs={lockerLogs} />
+              <div className="log-grid">
+                <DoorLogTable   logs={doorLogs} />
+                <LockerLogTable logs={lockerLogs} />
+              </div>
+            </>
+          )}
           <footer style={{ marginTop: '36px', paddingTop: '20px', borderTop: '1px solid var(--border-footer)', textAlign: 'center' }}>
             <p style={{ fontSize: '12.5px', color: 'var(--footer-text)' }}>
               Smart Safe Deposit Box © {new Date().getFullYear()} —{' '}
