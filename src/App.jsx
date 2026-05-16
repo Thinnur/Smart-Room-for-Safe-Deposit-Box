@@ -12,6 +12,7 @@ import LockerLogTable from './components/LockerLogTable'
 import CustomerManagement from './components/CustomerManagement'
 import AccessHistory from './components/AccessHistory'
 import Settings from './components/Settings'
+import WebcamWidget from './components/WebcamWidget'
 
 function Dashboard() {
   const [doorLogs, setDoorLogs] = useState([])
@@ -66,7 +67,7 @@ function Dashboard() {
 
     const channel = supabase
       .channel('dashboard-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_pintu' }, () => fetchDoorLogs())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'log_pintu' }, () => fetchDoorLogs())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_loker' }, () => fetchLockerLogs())
       .subscribe()
 
@@ -164,6 +165,7 @@ function MainLayout() {
           </footer>
         </main>
       </div>
+      <WebcamWidget />
     </div>
   )
 }
