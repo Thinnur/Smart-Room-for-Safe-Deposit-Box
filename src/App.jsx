@@ -13,6 +13,7 @@ import CustomerManagement from './components/CustomerManagement'
 import AccessHistory from './components/AccessHistory'
 import Settings from './components/Settings'
 import WebcamWidget from './components/WebcamWidget'
+import CameraPage from './pages/CameraPage'
 
 function Dashboard() {
   const [doorLogs, setDoorLogs] = useState([])
@@ -173,7 +174,10 @@ function MainLayout() {
 export default function App() {
   return (
     <Router>
-      <MainLayout />
+      <Routes>
+        <Route path="/camera" element={<CameraPage />} />
+        <Route path="/*" element={<MainLayout />} />
+      </Routes>
     </Router>
   )
 }

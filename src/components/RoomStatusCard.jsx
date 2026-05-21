@@ -13,7 +13,7 @@ export default function RoomStatusCard({ latestPintu }) {
     )
   }
 
-  const isOccupied = latestPintu.tipe_akses === 'MASUK'
+  const isOccupied = latestPintu.tipe_akses === 'MASUK' && !latestPintu.is_anomali
 
   return (
     <div

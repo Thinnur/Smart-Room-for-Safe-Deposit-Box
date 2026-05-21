@@ -33,3 +33,6 @@ stitch_modern_monitoring_dashboard/
 
 # OS files
 Thumbs.db
+
+# Git hooks
+.githooks/
