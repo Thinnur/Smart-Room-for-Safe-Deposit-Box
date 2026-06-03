@@ -1,6 +1,6 @@
 /*
  * ============================================================
- *  SMART SAFE DEPOSIT BOX - ESP8266 v5
+ *  SMART ROOM FOR SAFE DEPOSIT BOX - ESP8266 v5
  *  Board: NodeMCU 1.0 (ESP-12E)
  *
  *  [v5] Tambahan dari v4:

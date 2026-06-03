@@ -29,7 +29,7 @@ export default function Header() {
         </div>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-            Smart Safe Deposit Box
+            Smart Room for Safe Deposit Box
           </h1>
           <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', fontWeight: 500, marginTop: '2px' }}>
             Admin Panel — Monitoring Dashboard

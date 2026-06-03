@@ -609,6 +609,7 @@ body {
 .webcam-widget__btn--danger  { background: #ef4444; color: #fff; }
 .webcam-widget__btn--warning { background: #f59e0b; color: #fff; }
 .webcam-widget__btn--success { background: #22c55e; color: #fff; }
+.webcam-widget__btn--info { background: #3b82f6; color: #fff; }
 
 /* ═══════════════════════════════════════════════════════
    BOTTOM NAV — mobile only (≤ 1023px)

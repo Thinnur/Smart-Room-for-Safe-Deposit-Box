@@ -132,7 +132,7 @@ function MainLayout() {
 
       <div className="main-wrapper">
         <div className="top-bar">
-          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--topbar-title)' }}>SmartSafe IoT</span>
+          <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--topbar-title)' }}>SmartRoom IoT</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button className="topbar-btn" title="Notifikasi">
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>notifications</span>
@@ -164,7 +164,7 @@ function MainLayout() {
 
           <footer style={{ marginTop: '36px', paddingTop: '20px', borderTop: '1px solid var(--border-footer)', textAlign: 'center' }}>
             <p style={{ fontSize: '12.5px', color: 'var(--footer-text)' }}>
-              Smart Safe Deposit Box © {new Date().getFullYear()} -{' '}
+              Smart Room for Safe Deposit Box © {new Date().getFullYear()} -{' '}
               Real-time <span style={{ color: '#3b82f6', fontWeight: 600 }}>IoT Monitoring System</span>
             </p>
           </footer>

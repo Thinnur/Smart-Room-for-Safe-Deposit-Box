@@ -1,4 +1,4 @@
-# Firmware — Smart Safe Deposit Box ESP8266
+# Firmware — Smart Room for Safe Deposit Box ESP8266
 
 Panduan lengkap untuk mengkompilasi dan meng-flash firmware ke NodeMCU ESP8266.
 

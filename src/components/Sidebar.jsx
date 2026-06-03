@@ -16,7 +16,7 @@ export default function Sidebar() {
           <span className="material-symbols-outlined" style={{ color: 'white', fontSize: '18px' }}>lock_open</span>
         </div>
         <div>
-          <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>Smart Safe</p>
+          <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>Smart Room</p>
           <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>IoT Monitoring</p>
         </div>
       </div>
