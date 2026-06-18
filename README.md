@@ -6,34 +6,48 @@
 ![Vite](https://img.shields.io/badge/Vite-8-646cff?style=flat-square&logo=vite&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-Realtime-3ecf8e?style=flat-square&logo=supabase&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-06b6d4?style=flat-square&logo=tailwindcss&logoColor=white)
-![Arduino](https://img.shields.io/badge/Arduino-ESP8266-00979d?style=flat-square&logo=arduino&logoColor=white)
+![Arduino](https://img.shields.io/badge/Arduino-ESP32-00979d?style=flat-square&logo=arduino&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 
-Sistem keamanan brankas cerdas berbasis IoT dengan autentikasi **RFID + Fingerprint**,
+Sistem keamanan ruang brankas berbasis IoT dengan autentikasi **OTP via tombol fisik + Fingerprint**,
 pemantauan real-time via **Web Dashboard**, dan integrasi kamera otomatis.
 
 Dibangun sebagai proyek IoT Semester 4 — Teknologi Rekayasa Internet, Sekolah Vokasi UGM.
+
+**Live:** [safevault.akzara.id](https://safevault.akzara.id)
 
 </div>
 
 ---
 
-## Gambaran Sistem
+## Arsitektur Sistem
 
 ```
-Nasabah → [Scan RFID] → Pintu Buka
-         → [Scan Fingerprint] → Brankas Buka
-         → [Scan RFID] → Brankas Kunci + Pintu Buka
-
-ESP8266 ←→ Supabase (REST API + Realtime)
-              ↑↓
-         React Dashboard
-              ↑
-         Kamera HP (WebRTC → Supabase Storage)
+┌─────────────────────────────────────────────────────────┐
+│                    Dashboard Web                        │
+│         React 19 + Vite + Tailwind v4 + Router v7      │
+│                 safevault.akzara.id                     │
+└──────────────────────┬──────────────────────────────────┘
+                       │  REST / Realtime
+┌──────────────────────▼──────────────────────────────────┐
+│                     Supabase                            │
+│         PostgreSQL + Realtime + Storage                 │
+│  Tables: nasabah, loker, log_pintu, log_loker,          │
+│          commands, system_settings                      │
+└──────────────────────┬──────────────────────────────────┘
+                       │  HTTPS polling (setiap 5 detik)
+┌──────────────────────▼──────────────────────────────────┐
+│                   ESP32 Firmware                        │
+│            safebox_ESP32_v3_FAST.ino                    │
+│  State machine 6 state: STANDBY → PINTU_MASUK →        │
+│  DI_DALAM → BRANKAS_BUKA → PINTU_KELUAR → ALARM        │
+└──────────┬──────────────────────────┬───────────────────┘
+           │ UART2                    │ GPIO
+  ┌────────▼────────┐       ┌─────────▼──────────────────┐
+  │ Fingerprint     │       │ 6x Tombol OTP │ 2x Servo   │
+  │ AS608           │       │ 3x LED Status │ Buzzer     │
+  └─────────────────┘       └────────────────────────────┘
 ```
-
-**Alur state firmware:**
-`STANDBY → PINTU_MASUK → DI_DALAM → BRANKAS_BUKA → PINTU_KELUAR → STANDBY`
 
 ---
 
@@ -41,125 +55,174 @@ ESP8266 ←→ Supabase (REST API + Realtime)
 
 | Fitur | Keterangan |
 |---|---|
-| **Dual Auth** | RFID + Fingerprint wajib berurutan — tidak bisa dilewati |
+| **Dual Auth** | OTP 4 digit via tombol fisik + Fingerprint wajib berurutan |
+| **OTP per Nasabah** | Dashboard teller generate OTP CSPRNG per klik, berlaku 5 menit |
 | **Real-time Log** | Akses pintu & loker diperbarui otomatis via Supabase Realtime |
-| **Alert Anomali** | Notifikasi instan saat akses di luar jam kerja atau kartu tidak dikenal |
-| **Webcam Capture** | Foto otomatis saat ada event akses, di-upload ke Supabase Storage |
-| **Enroll dari Web** | Daftarkan RFID & sidik jari nasabah langsung dari dashboard |
-| **Serial Monitor** | Pantau log ESP8266 real-time dari browser via Web Serial API |
+| **Alert Anomali** | Notifikasi saat akses di luar jam kerja atau OTP/FP orang lain |
+| **Webcam Capture** | Foto otomatis saat event akses masuk, upload ke Supabase Storage |
+| **Enroll Fingerprint** | Daftarkan sidik jari nasabah langsung dari dashboard |
+| **Serial Monitor** | Pantau log ESP32 real-time dari browser via Web Serial API |
 | **Manajemen Nasabah** | CRUD nasabah beserta alokasi loker |
 | **Riwayat & Export** | Filter log berdasarkan tanggal/nama, export ke CSV |
-| **State Restore** | Firmware mendeteksi kondisi terakhir saat reboot |
+| **State Restore** | Firmware deteksi kondisi terakhir saat reboot |
 | **Dark / Light Mode** | Toggle tema, preferensi disimpan di localStorage |
 
 ---
 
 ## Tech Stack
 
-### Web Dashboard
-- **Frontend** — React 19, Vite 8, React Router v7
-- **Styling** — Tailwind CSS v4, CSS Custom Properties
-- **Backend** — Supabase (PostgreSQL, Realtime, Storage, Auth)
-- **Font** — Plus Jakarta Sans, JetBrains Mono
+| Layer | Teknologi |
+|-------|-----------|
+| **Frontend** | React 19, Vite 8, Tailwind v4, React Router v7 |
+| **Backend** | Supabase (PostgreSQL, Realtime, Storage) |
+| **Firmware** | Arduino ESP32 (C++) |
+| **Deployment** | K3s on Azure VPS, Traefik ingress |
+| **Domain** | safevault.akzara.id |
 
-### Firmware (ESP8266)
-- **Board** — NodeMCU ESP8266 (ESP-12E)
-- **Framework** — Arduino
-- **Library** — MFRC522, Adafruit_Fingerprint, ArduinoJson, ESP8266HTTPClient
-- **Auth** — HTTPS via BearSSL (tidak ada plain HTTP)
+---
+
+## State Machine Firmware
+
+```
+                   ┌──────────────────────────────────────┐
+                   ▼                                      │
+┌──────────┐  OTP valid   ┌─────────────┐  5 detik  ┌──────────┐
+│ STANDBY  │─────────────►│ PINTU_MASUK │──────────►│ DI_DALAM │
+└──────────┘              └─────────────┘           └────┬──┬───┘
+     ▲                                           FP OK  │  │ Long press
+     │                                         ┌────────┘  │ BTN1 (>2s)
+     │                               ┌─────────▼──────┐    │
+     │                               │ BRANKAS_BUKA   │    │
+     │                               └────────────────┘    │
+     │                             Long press BTN1 (>2s)   │
+     │                                         │            │
+     │                              ┌──────────▼──────┐    │
+     └──────────── 5 detik ─────────│  PINTU_KELUAR   │◄───┘
+                                    └─────────────────┘
+
+Dari state manapun → ALARM (OTP gagal 3x / FP gagal 3x / FP orang lain)
+ALARM non-blocking: maks 1 jam atau di-interrupt RESET_ALARM dari dashboard
+```
+
+| State | Deskripsi | LED |
+|-------|-----------|-----|
+| `STANDBY` | Tunggu input 4 digit OTP via tombol | Hijau |
+| `PINTU_MASUK` | Pintu terbuka, tunggu nasabah masuk (5 detik) | Hijau |
+| `DI_DALAM` | Nasabah di dalam, siap scan fingerprint | Hijau |
+| `BRANKAS_BUKA` | Brankas terbuka, tunggu selesai | Hijau |
+| `PINTU_KELUAR` | Pintu terbuka untuk keluar (5 detik) | Hijau |
+| `ALARM` | Pelanggaran keamanan, blink merah + buzzer | Merah blink |
 
 ---
 
 ## Hardware
 
-### Wiring Diagram
+### Komponen
 
-![Wiring Diagram](hardware/wiring/wiring_diagram_v2.svg)
+| Komponen | Spesifikasi |
+|----------|-------------|
+| Mikrokontroler | ESP32 Dev Module |
+| Fingerprint | Adafruit AS608 (UART) |
+| Aktuator Pintu | Servo SG90 |
+| Aktuator Brankas | Servo SG90 |
+| Input OTP | 6× Push Button (INPUT_PULLUP) |
+| Indikator | 3× LED (Hijau/Kuning/Merah) + resistor 220Ω |
+| Audio | Active Buzzer |
 
-### Komponen Utama
+### Wiring ESP32
 
-| Komponen | Spesifikasi | Fungsi |
-|----------|-------------|--------|
-| NodeMCU ESP8266 | ESP-12E | Mikrokontroler + WiFi |
-| RFID MFRC522 | 13.56 MHz | Baca kartu nasabah |
-| Fingerprint AS608 | Kapasitas 127 slot | Otentikasi biometrik |
-| Servo SG90 | 180° | Aktuator pintu & brankas |
-| Buzzer Aktif | 5V | Indikator audio |
+| Perangkat | Pin Perangkat | GPIO ESP32 |
+|-----------|--------------|------------|
+| **Fingerprint AS608** | TX | GPIO 16 (Serial2 RX) |
+| | RX | GPIO 17 (Serial2 TX) |
+| | VCC | 3.3V |
+| | GND | GND |
+| **Servo Pintu** | Signal | GPIO 13 |
+| **Servo Brankas** | Signal | GPIO 4 |
+| **Buzzer** (active, aktif HIGH) | + | GPIO 25 |
+| **LED Hijau** (Standby / OK) | + | GPIO 15 |
+| **LED Kuning** (Processing) | + | GPIO 2 |
+| **LED Merah** (Rejected / Alarm) | + | GPIO 26 |
+| **BTN1** (Digit 1 / Exit long-press) | – | GPIO 5 |
+| **BTN2** (Digit 2) | – | GPIO 33 |
+| **BTN3** (Digit 3) | – | GPIO 21 |
+| **BTN4** (Digit 4) | – | GPIO 22 |
+| **BTN5** (Digit 5) | – | GPIO 23 |
+| **BTN6** (Digit 6) | – | GPIO 32 |
 
-Daftar lengkap komponen dan harga: [`hardware/wiring/BOM.md`](hardware/wiring/BOM.md)
-
-### Cara Flash Firmware
-
-Lihat panduan lengkap di [`hardware/firmware/README.md`](hardware/firmware/README.md).
-
-```bash
-# 1. Masuk ke folder firmware
-cd hardware/firmware
-
-# 2. Salin dan isi config
-cp config.h.example config.h
-# Edit config.h dengan WiFi SSID, password, dan Supabase key
-
-# 3. Flash via Arduino IDE
-# Board: NodeMCU 1.0 (ESP-12E), Baud: 74880
-```
+> **Catatan:**
+> - Semua LED dipasang via resistor 220Ω ke GND.
+> - Semua tombol menggunakan `INPUT_PULLUP` — aktif LOW saat ditekan.
+> - Jangan gunakan GPIO 3 untuk buzzer — konflik dengan UART0 RX.
+> - ESP32-WROVER/PSRAM: GPIO 16/17 bisa bentrok dengan PSRAM. Pindah ke UART lain jika perlu.
 
 ---
 
-## Cara Menjalankan Dashboard
+## Database Supabase
 
-### Prerequisites
-- Node.js ≥ 20
-- Akun [Supabase](https://supabase.com) dengan project yang sudah dikonfigurasi
+### Tabel Utama
 
-### 1. Clone & Install
+| Tabel | Kegunaan |
+|-------|----------|
+| `nasabah` | Data nasabah: `id`, `nama`, `fingerprint_id` |
+| `loker` | Data loker: `id`, `id_nasabah`, `nomor_loker` |
+| `log_pintu` | Log akses pintu: `tipe_akses`, `is_anomali`, `id_nasabah`, `waktu_akses` |
+| `log_loker` | Log akses brankas: `status_akses`, `id_nasabah`, `id_loker` |
+| `commands` | Antrian perintah ESP32 ↔ dashboard |
+| `system_settings` | Konfigurasi: `jam_buka`, `jam_tutup` |
+
+> `commands.id` adalah `BIGINT` — treat sebagai `number` di JS, jangan dibandingkan sebagai string.
+
+### Tipe Command (`commands.type`)
+
+| Command | Arah | Payload | Deskripsi |
+|---------|------|---------|-----------|
+| `OTP_UNLOCK` | Dashboard → ESP32 | `nasabah_id`, `otp_code`, `expires_at` | Kirim OTP untuk membuka pintu |
+| `ENROLL_FP` | Dashboard → ESP32 | `nasabah_id`, `fingerprint_id` | Daftarkan sidik jari baru |
+| `LOCK_ALL` | Dashboard → ESP32 | — | Kunci semua, paksa ke STANDBY |
+| `RESET_ALARM` | Dashboard → ESP32 | — | Matikan alarm |
+| `UNLOCK_DOOR` | Dashboard → ESP32 | — | Buka pintu secara manual |
+| `REFRESH_CACHE` | Dashboard → ESP32 | — | Reload cache nasabah/loker |
+| `CAPTURE_PHOTO` | ESP32 → Kamera | `log_pintu_id` | Trigger foto saat akses masuk |
+
+---
+
+## Quick Start
+
+### 1. Clone & Setup Frontend
 
 ```bash
 git clone https://github.com/Thinnur/Web_Dashboard_Smart_Deposit_Box.git
 cd Web_Dashboard_Smart_Deposit_Box
 npm install
-```
-
-### 2. Setup Environment
-
-```bash
 cp .env.example .env
+# Edit .env dengan kredensial Supabase
+npm run dev
 ```
 
-Edit `.env` dengan kredensial Supabase project kamu:
+Edit `.env`:
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key-here
 ```
 
-> Temukan kedua nilai ini di **Supabase Dashboard → Project Settings → API**.
+### 2. Upload Firmware ESP32
 
-### 3. Jalankan
+1. Install library di Arduino IDE / PlatformIO:
+   - `Adafruit_Fingerprint`
+   - `ESP32Servo`
+   - `ArduinoJson` >= v6
+2. Buat file `hardware/firmware/config.h` dari template `config.example.h`
+3. Buka dan upload `hardware/firmware/safebox_ESP32_v3_FAST.ino`
+
+Detail lengkap: [`hardware/firmware/README.md`](hardware/firmware/README.md)
+
+### 3. Deployment (K3s)
 
 ```bash
-npm run dev
+kubectl apply -f k8s/
 ```
-
-Buka `http://localhost:5173`
-
----
-
-## Struktur Database (Supabase)
-
-```
-nasabah          → data pemilik loker (nama, rfid_uid, fingerprint_id)
-loker            → unit loker (nomor_loker, id_nasabah)
-log_pintu        → log akses pintu (waktu_akses, tipe_akses, is_anomali, url_foto)
-log_loker        → log akses loker (waktu_akses, status_akses, nomor_loker)
-commands         → command queue dari dashboard ke IoT device (type, status, payload)
-system_settings  → jam operasional (jam_buka, jam_tutup)
-
-view_log_pintu   → view join log_pintu + nasabah
-view_log_loker   → view join log_loker + nasabah + loker
-```
-
-Row Level Security (RLS) diaktifkan. Gunakan **anon key** — bukan service role key.
 
 ---
 
@@ -168,30 +231,29 @@ Row Level Security (RLS) diaktifkan. Gunakan **anon key** — bukan service role
 ```
 ├── hardware/
 │   ├── firmware/
-│   │   ├── safebox_ESP8266_v5.ino   # Firmware utama
-│   │   ├── config.h.example         # Template konfigurasi (salin → config.h)
-│   │   └── README.md                # Panduan flash & library
+│   │   ├── safebox_ESP32_v3_FAST.ino  # Firmware aktif (ESP32, OTP + Fingerprint)
+│   │   ├── safebox_ESP8266_v5.ino     # Versi lama ESP8266 (tidak dipakai)
+│   │   ├── config.example.h           # Template konfigurasi (salin → config.h)
+│   │   └── README.md                  # Panduan wiring, flash, & library
 │   └── wiring/
-│       ├── wiring_diagram_v1.svg    # Diagram wiring awal
-│       ├── wiring_diagram_v2.svg    # Diagram wiring revisi
-│       └── BOM.md                   # Bill of Materials
+│       ├── wiring_diagram_v1.svg
+│       ├── wiring_diagram_v2.svg
+│       └── BOM.md
 ├── src/
 │   ├── components/
 │   │   ├── Header.jsx
 │   │   ├── Sidebar.jsx
 │   │   ├── DoorLogTable.jsx
 │   │   ├── LockerLogTable.jsx
-│   │   ├── CustomerManagement.jsx   # CRUD nasabah + enrollment sensor
+│   │   ├── CustomerManagement.jsx   # CRUD nasabah + OTP dialog + enroll FP
+│   │   ├── OTPDialog.jsx            # Dialog OTP per nasabah (countdown 5 menit)
 │   │   ├── AccessHistory.jsx        # Filter, search, export CSV
 │   │   ├── Settings.jsx
 │   │   ├── SerialMonitor.jsx        # Web Serial API monitor
 │   │   └── WebcamWidget.jsx
-│   ├── context/
-│   │   └── ThemeContext.jsx
 │   ├── lib/
-│   │   └── supabaseClient.js
-│   ├── pages/
-│   │   └── CameraPage.jsx           # Halaman kamera untuk HP
+│   │   ├── supabaseClient.js
+│   │   └── generateOTP.js           # CSPRNG OTP, requestOTPAccess, cancelOTPAccess
 │   ├── App.jsx
 │   └── index.css
 ├── .env.example
@@ -204,7 +266,7 @@ Row Level Security (RLS) diaktifkan. Gunakan **anon key** — bukan service role
 ## Scripts
 
 ```bash
-npm run dev      # Development server
+npm run dev      # Development server (http://localhost:5173)
 npm run build    # Production build
 npm run preview  # Preview build hasil
 npm run lint     # ESLint check
@@ -218,7 +280,21 @@ npm run lint     # ESLint check
 - Kredensial firmware disimpan di `config.h` — tidak di-commit ke repository
 - Menggunakan **anon key** Supabase, bukan service role key
 - RLS aktif di semua tabel sensitif
-- Komunikasi ESP8266 ke Supabase menggunakan **HTTPS** (BearSSL)
+- Komunikasi ESP32 ke Supabase menggunakan **HTTPS** (WiFiClientSecure)
+- OTP di-generate via CSPRNG (Web Crypto API) dengan rejection sampling
+
+---
+
+## Tim
+
+| Nama | Peran |
+|------|-------|
+| Fathin | Firmware ESP32, IoT integration |
+| Nisrina | — |
+| Kalya | — |
+| Maria | — |
+
+**Program Studi:** Teknologi Rekayasa Internet — Sekolah Vokasi UGM
 
 ---
 

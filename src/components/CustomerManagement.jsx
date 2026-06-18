@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import OTPDialog from './OTPDialog'
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 const sendRefreshCache = async () => {
@@ -51,12 +52,11 @@ function Toast({ message, type, onClose }) {
   )
 }
 
-// ─── Enrollment Dialog ────────────────────────────────────────────────────────
-function EnrollmentDialog({ type, nasabahId, fingerprintId, onClose, onSuccess }) {
+// ─── Enrollment Dialog (Fingerprint) ───────────────────────────────────────────
+function EnrollmentDialog({ nasabahId, fingerprintId, onClose, onSuccess }) {
   const [progress, setProgress] = useState('Mengirim perintah ke alat...')
   const [cmdStatus, setCmdStatus] = useState('sending')
   const [cmdId, setCmdId] = useState(null)
-  const isRfid = type === 'ENROLL_RFID'
   const resolvedRef = useRef(false)
 
   useEffect(() => {
@@ -64,20 +64,18 @@ function EnrollmentDialog({ type, nasabahId, fingerprintId, onClose, onSuccess }
     let channel = null
     let pollTimer = null
 
-    const handleResult = (resultType, value) => {
+    const handleResult = (value) => {
       if (resolvedRef.current) return
       resolvedRef.current = true
-      onSuccess(resultType, value)
+      onSuccess(value)
     }
 
     const startEnroll = async () => {
-      const payload = isRfid
-        ? { nasabah_id: nasabahId }
-        : { nasabah_id: nasabahId, fingerprint_id: fingerprintId }
+      const payload = { nasabah_id: nasabahId, fingerprint_id: fingerprintId }
 
       const { data, error } = await supabase
         .from('commands')
-        .insert({ type, status: 'pending', payload })
+        .insert({ type: 'ENROLL_FP', status: 'pending', payload })
         .select('id')
         .single()
 
@@ -107,10 +105,7 @@ function EnrollmentDialog({ type, nasabahId, fingerprintId, onClose, onSuccess }
           if (prog) setProgress(prog)
           const st = updated.status
           setCmdStatus(st === 'pending' ? 'progress' : st)
-          if (st === 'done') {
-            if (isRfid) handleResult('rfid', updated.payload?.rfid_uid || '')
-            else handleResult('fp', updated.payload?.fingerprint_id)
-          }
+          if (st === 'done') handleResult(updated.payload?.fingerprint_id)
         })
         .subscribe()
 
@@ -129,8 +124,7 @@ function EnrollmentDialog({ type, nasabahId, fingerprintId, onClose, onSuccess }
         if (st !== 'pending') setCmdStatus(st)
         if (st === 'done') {
           clearInterval(pollTimer)
-          if (isRfid) handleResult('rfid', row.payload?.rfid_uid || '')
-          else handleResult('fp', row.payload?.fingerprint_id)
+          handleResult(row.payload?.fingerprint_id)
         } else if (st === 'error') {
           clearInterval(pollTimer)
         } else if (st === 'cancelled') {
@@ -175,21 +169,19 @@ function EnrollmentDialog({ type, nasabahId, fingerprintId, onClose, onSuccess }
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
           <div style={{
             width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
-            background: isRfid
-              ? 'linear-gradient(135deg,#3b82f6,#1d4ed8)'
-              : 'linear-gradient(135deg,#8b5cf6,#6d28d9)',
+            background: 'linear-gradient(135deg,#8b5cf6,#6d28d9)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <span className="material-symbols-outlined" style={{ color: 'white', fontSize: '22px' }}>
-              {isRfid ? 'nfc' : 'fingerprint'}
+              fingerprint
             </span>
           </div>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-              {isRfid ? 'Pendaftaran RFID' : 'Pendaftaran Sidik Jari'}
+              Pendaftaran Sidik Jari
             </h2>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
-              {isRfid ? 'Scan kartu via sensor alat' : `Slot ID #${fingerprintId}`}
+              Slot ID #{fingerprintId}
             </p>
           </div>
         </div>
@@ -218,8 +210,8 @@ function EnrollmentDialog({ type, nasabahId, fingerprintId, onClose, onSuccess }
           </div>
         </div>
 
-        {/* Step guide (FP only) */}
-        {!isRfid && isActive && (
+        {/* Step guide */}
+        {isActive && (
           <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
             {['Tempel Jari 1', 'Angkat Jari', 'Tempel Jari 2'].map((label, i) => (
               <div key={i} style={{ flex: 1, textAlign: 'center' }}>
@@ -275,7 +267,6 @@ function NasabahModal({ onClose, onSuccess, editData, allNasabah }) {
   const isEdit = !!editData
   const [form, setForm] = useState({
     nama: editData?.nama || '',
-    rfid_uid: editData?.rfid_uid || '',
     fingerprint_id: editData?.fingerprint_id ?? '',
   })
   const [selectedLoker, setSelectedLoker] = useState('')
@@ -317,7 +308,6 @@ function NasabahModal({ onClose, onSuccess, editData, allNasabah }) {
           .from('nasabah')
           .update({
             nama: form.nama.trim(),
-            rfid_uid: form.rfid_uid.trim() || null,
             fingerprint_id: form.fingerprint_id !== '' ? parseInt(form.fingerprint_id) : null,
           })
           .eq('id', editData.id)
@@ -327,7 +317,6 @@ function NasabahModal({ onClose, onSuccess, editData, allNasabah }) {
           .from('nasabah')
           .insert([{
             nama: form.nama.trim(),
-            rfid_uid: form.rfid_uid.trim() || null,
             fingerprint_id: form.fingerprint_id !== '' ? parseInt(form.fingerprint_id) : null,
           }])
           .select()
@@ -357,10 +346,6 @@ function NasabahModal({ onClose, onSuccess, editData, allNasabah }) {
     }
   }
 
-  const openRfidEnroll = () => {
-    setEnrollDialog({ type: 'ENROLL_RFID', nasabahId: enrollId, fpTargetId: null })
-  }
-
   const openFpEnroll = () => {
     const currentFpId = form.fingerprint_id !== '' ? parseInt(form.fingerprint_id) : null
     const fpTargetId = currentFpId || findNextFingerprintId(allNasabah, enrollId)
@@ -368,7 +353,7 @@ function NasabahModal({ onClose, onSuccess, editData, allNasabah }) {
       alert('Semua slot sidik jari (1-127) sudah terisi.')
       return
     }
-    setEnrollDialog({ type: 'ENROLL_FP', nasabahId: enrollId, fpTargetId })
+    setEnrollDialog({ nasabahId: enrollId, fpTargetId })
   }
 
   const inputStyle = {
@@ -413,31 +398,6 @@ function NasabahModal({ onClose, onSuccess, editData, allNasabah }) {
             <div>
               <label style={labelStyle}>Nama Lengkap *</label>
               <input name="nama" value={form.nama} onChange={handleChange} required placeholder="Masukkan nama nasabah" style={inputStyle} />
-            </div>
-
-            {/* RFID + scan button */}
-            <div>
-              <label style={labelStyle}>UID RFID</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input name="rfid_uid" value={form.rfid_uid} onChange={handleChange} placeholder="Contoh: A3F2B1C4" style={{ ...inputStyle, flex: 1 }} />
-                {canScan && (
-                  <button
-                    type="button"
-                    onClick={openRfidEnroll}
-                    title="Scan RFID via alat"
-                    style={scanBtnStyle}
-                    onMouseOver={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.color = '#60a5fa' }}
-                    onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border-card)'; e.currentTarget.style.color = 'var(--text-muted)' }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>nfc</span>
-                  </button>
-                )}
-              </div>
-              {canScan && (
-                <p style={{ fontSize: '11px', color: 'var(--text-subtle)', marginTop: '5px' }}>
-                  Klik ikon NFC untuk mendaftarkan kartu langsung dari sensor alat.
-                </p>
-              )}
             </div>
 
             {/* Fingerprint + scan button */}
@@ -539,16 +499,11 @@ function NasabahModal({ onClose, onSuccess, editData, allNasabah }) {
       {/* Enrollment dialog — rendered above modal */}
       {enrollDialog && (
         <EnrollmentDialog
-          type={enrollDialog.type}
           nasabahId={enrollDialog.nasabahId}
           fingerprintId={enrollDialog.fpTargetId}
           onClose={() => setEnrollDialog(null)}
-          onSuccess={(resultType, value) => {
-            if (resultType === 'rfid') {
-              setForm(f => ({ ...f, rfid_uid: value || '' }))
-            } else {
-              setForm(f => ({ ...f, fingerprint_id: value ?? '' }))
-            }
+          onSuccess={(value) => {
+            setForm(f => ({ ...f, fingerprint_id: value ?? '' }))
             setEnrollDialog(null)
           }}
         />
@@ -688,6 +643,7 @@ export default function CustomerManagement() {
   const [showModal, setShowModal]       = useState(false)
   const [showLokerModal, setShowLokerModal] = useState(false)
   const [editTarget, setEditTarget]     = useState(null)
+  const [otpTarget, setOtpTarget]       = useState(null)
   const [toast, setToast]               = useState(null)
   const [searchQuery, setSearchQuery]   = useState('')
 
@@ -948,6 +904,23 @@ export default function CustomerManagement() {
                           <td style={{ textAlign: 'right' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
                               <button
+                                onClick={() => setOtpTarget(n)}
+                                title="Akses OTP"
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '5px',
+                                  padding: '6px 12px', borderRadius: '8px',
+                                  border: '1px solid rgba(34,197,94,0.25)',
+                                  background: 'rgba(34,197,94,0.06)', color: '#4ade80',
+                                  fontSize: '12.5px', fontWeight: 600, cursor: 'pointer',
+                                  fontFamily: 'var(--font-sans)', transition: 'all 0.15s ease',
+                                }}
+                                onMouseOver={e => { e.currentTarget.style.background = 'rgba(34,197,94,0.14)' }}
+                                onMouseOut={e => { e.currentTarget.style.background = 'rgba(34,197,94,0.06)' }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>pin</span>
+                                Akses OTP
+                              </button>
+                              <button
                                 onClick={() => openEdit(n)}
                                 title="Edit"
                                 style={{
@@ -1130,6 +1103,10 @@ export default function CustomerManagement() {
           onClose={() => setShowLokerModal(false)}
           onSuccess={handleLokerModalSuccess}
         />
+      )}
+
+      {otpTarget && (
+        <OTPDialog nasabah={otpTarget} onClose={() => setOtpTarget(null)} />
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
