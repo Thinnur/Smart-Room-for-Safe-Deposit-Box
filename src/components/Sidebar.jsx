@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import safevaultIcon from '../assets/safevault-icon.png'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: 'dashboard', end: true },
@@ -12,11 +13,9 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">
-          <span className="material-symbols-outlined" style={{ color: 'white', fontSize: '18px' }}>lock_open</span>
-        </div>
+        <img src={safevaultIcon} alt="SafeVault" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} />
         <div>
-          <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>Smart Room</p>
+          <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>SafeVault</p>
           <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>IoT Monitoring</p>
         </div>
       </div>
