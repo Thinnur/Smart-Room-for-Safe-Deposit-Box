@@ -2,6 +2,9 @@
 
 <div align="center">
 
+<img src="src\assets\safevault-logo.png" alt="SafeVault Logo" width="480" />
+
+
 ![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646cff?style=flat-square&logo=vite&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-Realtime-3ecf8e?style=flat-square&logo=supabase&logoColor=white)
