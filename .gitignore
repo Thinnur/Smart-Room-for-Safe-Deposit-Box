@@ -40,3 +40,6 @@ Thumbs.db
 
 # Git hooks
 .githooks/
+
+#AI files
+CLAUDE.md
